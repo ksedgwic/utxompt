@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
 
+import json
 import sys
 import plyvel
 
 from storage.refcount_db import RefcountDB
 from trie.trie import Trie
 
+def beautify(thing):
+    """Convert a nested list of bytes into nested list of hex encoded strings"""
+    if type(thing) == list:
+        retval = []
+        for item in thing:
+            retval.append(beautify(item))
+        return retval
+    elif type(thing) == bytes:
+        return thing.hex()
+    else:
+        print(type(thing))
+        sys.exit(1)
+        
 def jnk():
     db = plyvel.DB('./db/', create_if_missing=True)
     mpt = Trie(RefcountDB(db))
@@ -29,7 +43,8 @@ def process_lines():
     coinbase_txid = bytes.fromhex(
         '0000000000000000000000000000000000000000000000000000000000000000'
     )
-    
+
+    ninputs = 0
     for line in map(str.rstrip, sys.stdin):
         fields = line.split(':')
         if fields[0] == 'O':
@@ -47,11 +62,22 @@ def process_lines():
             index = int(fields[2])
             ndx = index.to_bytes(4, byteorder='big')
             if txid != coinbase_txid:
+                ninputs += 1
                 print(txid.hex(), index)
                 key = txid[0:28] + ndx	# BOGUS - need 36 byte keys!
+
+                # Print out proof every 1000 inputs
+                if ninputs % 1000 == 0:
+                    vv, proof = mpt.get(key, with_proof=True)
+                    proof.insert(0, mpt.root_node)
+                    print("Proof for %s:%d" % (txid.hex(), index))
+                    print(json.dumps(beautify(proof), indent=4))
+                
                 # mpt.delete(key)
-                amt = b''
+                amt = b''		# BOGUS
                 mpt.update(key, amt)	# BOGUS
+
+
         else:
             sys.exit("unknown first field: %s" % (fields[0],))
     
