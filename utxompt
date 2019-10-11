@@ -49,6 +49,7 @@ def process_lines():
         '0000000000000000000000000000000000000000000000000000000000000000'
     )
 
+    nutxo = 0
     ninputs = 0
     for line in map(str.rstrip, sys.stdin):
         fields = line.split(':')
@@ -61,6 +62,7 @@ def process_lines():
             print(txid.hex(), index, amount)
             key = txid[0:28] + ndx	# BOGUS - need 36 byte keys!
             mpt.update(key, amt)
+            nutxo += 1
         elif fields[0] == 'I':
             dixt = bytes.fromhex(fields[1])
             txid = dixt[::-1]
@@ -75,11 +77,12 @@ def process_lines():
                 if ninputs % 1000 == 0:
                     vv, proof = mpt.get(key, with_proof=True)
                     proof.insert(0, mpt.root_node)
+                    print("UTXO Count %d" % (nutxo,))
                     print("Proof for %s:%d" % (txid.hex(), index))
                     print(json.dumps(beautify(proof), indent=4))
                 
                 # mpt.delete(key)
-                amt = b''		# BOGUS
+                amt = (0).to_bytes(8, byteorder='big')		# BOGUS
                 mpt.update(key, amt)	# BOGUS
 
 
