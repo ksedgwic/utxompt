@@ -5,6 +5,7 @@ import sys
 import plyvel
 
 from storage.refcount_db import RefcountDB
+from storage.ephem_db import EphemDB
 from trie.trie import Trie
 
 def beautify(thing):
@@ -37,11 +38,12 @@ def jnk():
     print(proof)
 
 def process_lines():
-    db = plyvel.DB('./db/',
-                   create_if_missing=True,
-                   lru_cache_size=8*1024**3,
-                   write_buffer_size=128*1024**2)
-    mpt = Trie(RefcountDB(db))
+    # db = plyvel.DB('./db/',
+    #     create_if_missing=True,
+    #     lru_cache_size=8*1024**3,
+    #     write_buffer_size=128*1024**2)
+    # mpt = Trie(RefcountDB(db))
+    mpt = Trie(RefcountDB(EphemDB()))
 
     coinbase_txid = bytes.fromhex(
         '0000000000000000000000000000000000000000000000000000000000000000'

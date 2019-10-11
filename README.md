@@ -31,5 +31,5 @@ Use Rusty's bitcoin-iterate to generate text records and process:
         --blockdir /mnt/t5/blocks \
         --input=I:%ih:%ii \
         --output=O:%th:%oN:%oa \
-        | ./utxompt
+        | ./utxompt | tee output.log
 
