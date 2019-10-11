@@ -43,7 +43,7 @@ def process_lines():
     #     lru_cache_size=8*1024**3,
     #     write_buffer_size=128*1024**2)
     # mpt = Trie(RefcountDB(db))
-    mpt = Trie(RefcountDB(EphemDB()))
+    mpt = Trie(EphemDB())
 
     coinbase_txid = bytes.fromhex(
         '0000000000000000000000000000000000000000000000000000000000000000'
