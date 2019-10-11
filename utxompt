@@ -37,7 +37,10 @@ def jnk():
     print(proof)
 
 def process_lines():
-    db = plyvel.DB('./db/', create_if_missing=True)
+    db = plyvel.DB('./db/',
+                   create_if_missing=True,
+                   lru_cache_size=8*1024**3,
+                   write_buffer_size=128*1024**2)
     mpt = Trie(RefcountDB(db))
 
     coinbase_txid = bytes.fromhex(
