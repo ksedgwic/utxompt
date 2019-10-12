@@ -387,3 +387,7 @@ py-trie
 ----------------------------------------------------------------
 
 205230 1.0g
+
+
+    raise MissingTrieNode(exception.args[0], self.root_hash, key) from exception
+trie.exceptions.MissingTrieNode: Trie database is missing hash 0xce7742ae0be59af088b71b1188a2b4c0f5d621e2c443857bd7b574fa5c94be52 needed to look up key 0x1dab240c95b9f44e00687bed644b791c7871cc8f252150c32733b6684b59948100000001 at root hash 0x42c6f2275fa5f906a559e502ec77163c4116387cb80fa3253e96b512cb7b2a09

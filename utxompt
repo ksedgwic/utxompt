@@ -39,52 +39,130 @@ def jnk():
     vv = HexaryTrie.get_from_proof(mpt.root_hash, key2, proof)
     print(proof)
 
+nutxo = 0
+ninputs = 0
+coinbase_txid = bytes.fromhex(
+    '0000000000000000000000000000000000000000000000000000000000000000'
+)
+
 def process_lines():
+    global nutxo
+    global ninputs
     db = {}
     mpt = HexaryTrie(db)
-
-    coinbase_txid = bytes.fromhex(
-        '0000000000000000000000000000000000000000000000000000000000000000'
-    )
-
+    nblocks = 0
     nutxo = 0
     ninputs = 0
+    batch = []
     for line in map(str.rstrip, sys.stdin):
-        fields = line.split(':')
-        if fields[0] == 'O':
-            txid = bytes.fromhex(fields[1])
-            index = int(fields[2])
-            ndx = index.to_bytes(4, byteorder='big')
-            amount = int(fields[3])
-            amt = amount.to_bytes(8, byteorder='big')
-            print(txid.hex(), index, amount)
-            key = txid[0:28] + ndx	# BOGUS - need 36 byte keys!
-            mpt[key] = amt
-            nutxo += 1
-        elif fields[0] == 'I':
-            dixt = bytes.fromhex(fields[1])
-            txid = dixt[::-1]
-            index = int(fields[2])
-            ndx = index.to_bytes(4, byteorder='big')
-            if txid != coinbase_txid:
-                ninputs += 1
-                print(txid.hex(), index)
-                key = txid[0:28] + ndx	# BOGUS - need 36 byte keys!
-
-                # Print out proof every 1000 inputs
-                if ninputs % 1000 == 0:
-                    proof = mpt.get_proof(key)
-                    vv = HexaryTrie.get_from_proof(mpt.root_hash, key, proof)
-                    print("UTXO Count %d" % (nutxo,))
-                    print("Proof for %s:%d" % (txid.hex(), index))
-                    print(json.dumps(beautify(proof), indent=4))
-
-                del mpt[key]
-
+        if line[0] == 'B':
+            nblocks += 1
+            if nblocks % 1000 == 0:
+                process_batch(mpt, batch)
+                batch = []
         else:
-            sys.exit("unknown first field: %s" % (fields[0],))
-    
+            batch.append(line)
+
+def process_batch(mpt, batch):
+    with mpt.squash_changes() as memory_trie:
+        for line in batch:
+            process_line(memory_trie, line)
+
+def process_line(mpt, line):
+    global nutxo
+    global ninputs
+    global coinbase_txid
+    fields = line.split(':')
+    if fields[0] == 'O':
+        txid = bytes.fromhex(fields[1])
+        index = int(fields[2])
+        ndx = index.to_bytes(4, byteorder='big')
+        amount = int(fields[3])
+        amt = amount.to_bytes(8, byteorder='big')
+        print(txid.hex(), index, amount)
+        key = txid + ndx
+        mpt[key] = amt
+        nutxo += 1
+    elif fields[0] == 'I':
+        dixt = bytes.fromhex(fields[1])
+        txid = dixt[::-1]
+        index = int(fields[2])
+        ndx = index.to_bytes(4, byteorder='big')
+        if txid != coinbase_txid:
+            ninputs += 1
+            print(txid.hex(), index)
+            key = txid + ndx
+
+            # Print out proof every 1000 inputs
+            if ninputs % 1000 == 0:
+                proof = mpt.get_proof(key)
+                vv = HexaryTrie.get_from_proof(mpt.root_hash, key, proof)
+                print("UTXO Count %d" % (nutxo,))
+                print("Proof for %s:%d" % (txid.hex(), index))
+                print(json.dumps(beautify(proof), indent=4))
+
+            # del mpt[key]	# BOGUS!!!
+
+    else:
+        sys.exit("unknown first field: %s" % (fields[0],))
+
+sample_lines = [
+    'B:0',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b:0:5000000000',
+    'B:1',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098:0:5000000000',
+    'B:2',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5:0:5000000000',
+    'B:3',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:999e1c837c76a1b7fbb7e57baf87b309960f5ffefbf2a9b95dd890602272f644:0:5000000000',
+    'B:4',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:df2b060fa2e5e9c8ed5eaf6a45c13753ec8c63282b2688322eba40cd98ea067a:0:5000000000',
+    'B:5',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:63522845d294ee9b0188ae5cac91bf389a0c3723f084ca1025e7d9cdfe481ce1:0:5000000000',
+    'B:6',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:20251a76e64e920e58291a30d4b212939aae976baca40e70818ceaa596fb9d37:0:5000000000',
+    'B:7',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:8aa673bc752f2851fd645d6a0a92917e967083007d9c1684f9423b100540673f:0:5000000000',
+    'B:8',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:a6f7f1c0dad0f2eb6b13c4f33de664b1b0e9f22efad5994a6d5b6086d85e85e3:0:5000000000',
+    'B:9',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9:0:5000000000',
+    'B:10',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:d3ad39fa52a89997ac7381c95eeffeaf40b66af7a57e9eba144be0a175a12b11:0:5000000000',
+    'B:11',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:f8325d8f7fa5d658ea143629288d0530d2710dc9193ddc067439de803c37066e:0:5000000000',
+    'B:12',
+    'I:0000000000000000000000000000000000000000000000000000000000000000:4294967295',
+    'O:3b96bb7e197ef276b85131afd4a09c059cc368133a26ca04ebffb0ab4f75c8b8:0:5000000000',
+]
+
+def process_sample():
+    global nutxo
+    global ninputs
+    db = {}
+    mpt = HexaryTrie(db)
+    nutxo = 0
+    ninputs = 0
+    with mpt.squash_changes() as memory_trie:
+        for line in sample_lines:
+            process_line(memory_trie, line)
+    for kk, vv in db.items():
+        print(kk.hex())
+        print(json.dumps(beautify(vv), indent=4))
 
 if __name__ == '__main__':
     # jnk()
+    # process_sample()
     process_lines()
