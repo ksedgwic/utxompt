@@ -2,24 +2,38 @@
 UTXO Set in a Merkle Patricia Trie
 
 
-#### Merkle-Patricia-Trie
+#### levelpy
 
-    git clone git@github.com:lovesh/Merkle-Patricia-Trie.git
+    git clone git@github.com:akubera/levelpy.git
 
 ```
-diff --git a/storage/refcount_db.py b/storage/refcount_db.py
-index 44e4f7c..2e4c64c 100644
---- a/storage/refcount_db.py
-+++ b/storage/refcount_db.py
-@@ -37,7 +37,7 @@ class RefcountDB:
-             assert existing[4:] == value
-             self.db.put(key, add1(existing[:4]) + value)
-             # print('putin', key, utils.big_endian_to_int(existing[:4]) + 1)
--        except KeyError:
-+        except (KeyError, TypeError):
-             self.db.put(key, b'\x00\x00\x00\x01' + value)
-             # print('putin', key, 1)
+diff --git a/levelpy/serializer.py b/levelpy/serializer.py
+index 721a429..4a92b81 100644
+--- a/levelpy/serializer.py
++++ b/levelpy/serializer.py
+@@ -34,6 +34,14 @@ def binary_decode(byte_str):
+     return byte_str
  
+ 
++def bytes_encode(byte_str):
++    return bytes(byte_str)
++
++
++def bytes_decode(byte_str):
++    return bytes(byte_str)
++
++
+ class MsgPackSerializer:
+ 
+     def __init__(self):
+@@ -58,6 +66,7 @@ class Serializer:
+         'utf-8': (utf8_encode, utf8_decode),
+         'bin': (binary_encode, binary_decode),
+         'binary': (binary_encode, binary_decode),
++        'bytes': (bytes_encode, bytes_decode),
+         'none': (binary_encode, binary_decode),
+         'msgpack': (MsgPackSerializer.encode, MsgPackSerializer.decode)
+     }
 ```
 
 #### Running

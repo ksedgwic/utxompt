@@ -2,6 +2,8 @@
 
 import json
 import sys
+import leveldb
+from levelpy.leveldb import LevelDB
 
 from trie import HexaryTrie
 
@@ -45,11 +47,27 @@ coinbase_txid = bytes.fromhex(
     '0000000000000000000000000000000000000000000000000000000000000000'
 )
 
+def mkkey(txid, index):
+    ndx = index.to_bytes(4, byteorder='big')
+    return txid[0:28] + ndx	# BOGUS
+
+def print_proof(mpt, txid, index):
+    key = mkkey(txid, index)
+    proof = mpt.get_proof(key)
+    vv = HexaryTrie.get_from_proof(mpt.root_hash, key, proof)
+    print("Proof for %s:%d" % (txid.hex(), index))
+    print(json.dumps(beautify(proof), indent=4))
+    sys.stdout.flush()
+
 def process_lines():
     global nutxo
     global ninputs
-    db = {}
-    mpt = HexaryTrie(db)
+    db = LevelDB('./db',
+                 value_encoding="bytes",
+                 create_if_missing=True,
+                 error_if_exists=True)
+    mptdb = HexaryTrie(db)
+    roots = open("./roots.txt", "w+")
     nblocks = 0
     nutxo = 0
     ninputs = 0
@@ -58,62 +76,53 @@ def process_lines():
         if line[0] == 'B':
             nblocks += 1
             if nblocks % 1000 == 0:
-                process_batch(mpt, batch)
+                process_batch(nblocks, roots, mptdb, batch)
                 batch = []
         else:
             batch.append(line)
 
-saved_txid = None
-saved_index = None
-saved_key = None
-            
-def process_batch(mpt, batch):
-    with mpt.squash_changes() as memory_trie:
+def process_batch(nblocks, roots, mptdb, batch):
+    with mptdb.squash_changes() as memory_trie:
         for line in batch:
             process_line(memory_trie, line)
+    roots.write("%d %s\n" % (nblocks, mptdb.root_hash.hex()))
+    roots.flush()
 
-    if saved_key:
-        proof = mpt.get_proof(saved_key)
-        vv = HexaryTrie.get_from_proof(mpt.root_hash, saved_key, proof)
-        print("UTXO Count %d" % (nutxo,))
-        print("Proof for %s:%d" % (saved_txid.hex(), saved_index))
-        print(json.dumps(beautify(proof), indent=4))
+xxtxid = bytes.fromhex('1dab240c95b9f44e00687bed644b791c7871cc8f252150c32733b6684b599481')
+xxindex = 1
 
 def process_line(mpt, line):
     global nutxo
     global ninputs
     global coinbase_txid
-    global saved_txid
-    global saved_index
-    global saved_key
     fields = line.split(':')
     if fields[0] == 'O':
         txid = bytes.fromhex(fields[1])
         index = int(fields[2])
-        ndx = index.to_bytes(4, byteorder='big')
         amount = int(fields[3])
-        amt = amount.to_bytes(8, byteorder='big')
         print(txid.hex(), index, amount)
-        key = txid + ndx
+        amt = amount.to_bytes(8, byteorder='big')
+        key = mkkey(txid, index)
         mpt[key] = amt
         nutxo += 1
     elif fields[0] == 'I':
         dixt = bytes.fromhex(fields[1])
         txid = dixt[::-1]
         index = int(fields[2])
-        ndx = index.to_bytes(4, byteorder='big')
         if txid != coinbase_txid:
+            if txid.hex() == '8ef28249e5d50230214bded5ffc7769fcb3c6d937779a5aabb6a4088e1c8b78f' and index == 0:
+                print_proof(mpt, xxtxid, xxindex)
             ninputs += 1
             print(txid.hex(), index)
-            key = txid + ndx
-
-            # Print out proof every 1000 inputs
-            if ninputs % 1000 == 0:
-                saved_txid = txid
-                saved_index = index
-                saved_key = key
-
-            # del mpt[key]	# BOGUS!!!
+            key = mkkey(txid, index)
+            try:
+                del mpt[key]
+            except Exception as ex:
+                print("Trouble w/ %s:%d %s" % (txid.hex(), index, ex))
+                raise
+            nutxo -= 1
+            if txid.hex() == '8ef28249e5d50230214bded5ffc7769fcb3c6d937779a5aabb6a4088e1c8b78f' and index == 0:
+                print_proof(mpt, txid, index)
 
     else:
         sys.exit("unknown first field: %s" % (fields[0],))
