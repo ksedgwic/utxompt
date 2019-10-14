@@ -63,15 +63,29 @@ def process_lines():
         else:
             batch.append(line)
 
+saved_txid = None
+saved_index = None
+saved_key = None
+            
 def process_batch(mpt, batch):
     with mpt.squash_changes() as memory_trie:
         for line in batch:
             process_line(memory_trie, line)
 
+    if saved_key:
+        proof = mpt.get_proof(saved_key)
+        vv = HexaryTrie.get_from_proof(mpt.root_hash, saved_key, proof)
+        print("UTXO Count %d" % (nutxo,))
+        print("Proof for %s:%d" % (saved_txid.hex(), saved_index))
+        print(json.dumps(beautify(proof), indent=4))
+
 def process_line(mpt, line):
     global nutxo
     global ninputs
     global coinbase_txid
+    global saved_txid
+    global saved_index
+    global saved_key
     fields = line.split(':')
     if fields[0] == 'O':
         txid = bytes.fromhex(fields[1])
@@ -95,11 +109,9 @@ def process_line(mpt, line):
 
             # Print out proof every 1000 inputs
             if ninputs % 1000 == 0:
-                proof = mpt.get_proof(key)
-                vv = HexaryTrie.get_from_proof(mpt.root_hash, key, proof)
-                print("UTXO Count %d" % (nutxo,))
-                print("Proof for %s:%d" % (txid.hex(), index))
-                print(json.dumps(beautify(proof), indent=4))
+                saved_txid = txid
+                saved_index = index
+                saved_key = key
 
             # del mpt[key]	# BOGUS!!!
 
