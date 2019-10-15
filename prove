@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+
+import json
+import sys
+from levelpy.leveldb import LevelDB
+from trie import HexaryTrie
+
+def beautify(thing):
+    """Convert a nested list of bytes into nested list of hex encoded strings"""
+    if type(thing) == list:
+        retval = []
+        for item in thing:
+            retval.append(beautify(item))
+        return retval
+    elif type(thing) == tuple:
+        retval = []
+        for item in thing:
+            retval.append(beautify(item))
+        return tuple(retval)
+    elif type(thing) == bytes:
+        return thing.hex()
+    else:
+        print(type(thing))
+        sys.exit(1)
+        
+def mkkey(txid, index):
+    ndx = index.to_bytes(4, byteorder='big')
+    return txid + ndx
+
+def generate_proof(roothash, txid, index):
+    db = LevelDB('./db', value_encoding="bytes")
+    mptdb = HexaryTrie(db, root_hash=roothash)
+    key = mkkey(txid, index)
+    proof = mptdb.get_proof(key)
+    value = HexaryTrie.get_from_proof(roothash, key, proof)
+    if value != b'':
+        print(json.dumps(beautify(proof), indent=4))
+    else:
+        print("not found")
+    
+if __name__ == '__main__':
+    roothash = bytes.fromhex(sys.argv[1])
+    txid = bytes.fromhex(sys.argv[2])
+    index = int(sys.argv[3])
+    generate_proof(roothash, txid, index)

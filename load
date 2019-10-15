@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+
+import json
+import sys
+from levelpy.leveldb import LevelDB
+
+from trie import HexaryTrie
+
+nutxo = 0
+ninputs = 0
+coinbase_txid = bytes.fromhex(
+    '0000000000000000000000000000000000000000000000000000000000000000'
+)
+serial = 0
+
+def mkkey(txid, index):
+    ndx = index.to_bytes(4, byteorder='big')
+    return txid + ndx
+
+def process_lines():
+    global nutxo
+    global ninputs
+    db = LevelDB('./db',
+                 value_encoding="bytes",
+                 create_if_missing=True,
+                 error_if_exists=True)
+    mptdb = HexaryTrie(db)
+    roots = open("./roots.txt", "w+")
+    nblocks = 0
+    nutxo = 0
+    ninputs = 0
+    batch = []
+    for line in map(str.rstrip, sys.stdin):
+        if line[0] == 'B':
+            nblocks += 1
+            if nblocks % 1000 == 0:
+                process_batch(nblocks, roots, mptdb, batch)
+                batch = []
+        else:
+            batch.append(line)
+
+def process_batch(nblocks, roots, mptdb, batch):
+    with mptdb.squash_changes() as memory_trie:
+        for line in batch:
+            process_line(memory_trie, line)
+    print("WRITING %d %s %d" % (nblocks, mptdb.root_hash.hex(), nutxo))
+    roots.write("%d %s %d\n" % (nblocks, mptdb.root_hash.hex(), nutxo))
+    roots.flush()
+
+def process_line(mpt, line):
+    global nutxo
+    global ninputs
+    global coinbase_txid
+    global serial
+    fields = line.split(':')
+    if fields[0] == 'O':
+        txid = bytes.fromhex(fields[1])
+        index = int(fields[2])
+        amount = int(fields[3])	# ignored
+        serial += 1
+        print(txid.hex(), index, serial)
+        val = serial.to_bytes(8, byteorder='big')
+        key = mkkey(txid, index)
+        mpt[key] = val
+        nutxo += 1
+    elif fields[0] == 'I':
+        dixt = bytes.fromhex(fields[1])
+        txid = dixt[::-1]
+        index = int(fields[2])
+        if txid != coinbase_txid:
+            ninputs += 1
+            print(txid.hex(), index)
+            key = mkkey(txid, index)
+            try:
+                del mpt[key]
+            except Exception as ex:
+                print("Trouble w/ %s:%d %s" % (txid.hex(), index, ex))
+                raise
+            nutxo -= 1
+    else:
+        sys.exit("unknown first field: %s" % (fields[0],))
+        
+if __name__ == '__main__':
+    process_lines()

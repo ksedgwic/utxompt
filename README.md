@@ -36,7 +36,7 @@ index 721a429..4a92b81 100644
      }
 ```
 
-#### Running
+#### Loading the DB
 
 Use Rusty's bitcoin-iterate to generate text records and process:
 
@@ -46,5 +46,22 @@ Use Rusty's bitcoin-iterate to generate text records and process:
         --block=B:%bN \
         --input=I:%ih:%ii \
         --output=O:%th:%oN:%oa \
-        | ./utxompt | tee output.log
+        | ./load | tee output.log
+        
+The loader will create a list of root block hashes in `roots.txt`.
 
+#### Generate a proof
+
+The proof generator takes root_hash, txid and index as args:
+
+    ./prove \
+        6c079c9cfbc0d3dfe9f7133adb69ce8a555bb7641e4e3d988f19b0228e8f4640 \
+        7e55be4820c159fd990893c8508e063bc5fe142d49ccca604647078c2c9305a7 \
+        0 > proof.txt
+        
+#### Verify a proof
+
+    ./verify \
+        6c079c9cfbc0d3dfe9f7133adb69ce8a555bb7641e4e3d988f19b0228e8f4640 \
+        7e55be4820c159fd990893c8508e063bc5fe142d49ccca604647078c2c9305a7 \
+        0

@@ -46,6 +46,7 @@ ninputs = 0
 coinbase_txid = bytes.fromhex(
     '0000000000000000000000000000000000000000000000000000000000000000'
 )
+serial = 0
 
 def mkkey(txid, index):
     ndx = index.to_bytes(4, byteorder='big')
@@ -88,30 +89,27 @@ def process_batch(nblocks, roots, mptdb, batch):
     roots.write("%d %s\n" % (nblocks, mptdb.root_hash.hex()))
     roots.flush()
 
-xxtxid = bytes.fromhex('1dab240c95b9f44e00687bed644b791c7871cc8f252150c32733b6684b599481')
-xxindex = 1
-
 def process_line(mpt, line):
     global nutxo
     global ninputs
     global coinbase_txid
+    global serial
     fields = line.split(':')
     if fields[0] == 'O':
         txid = bytes.fromhex(fields[1])
         index = int(fields[2])
-        amount = int(fields[3])
-        print(txid.hex(), index, amount)
-        amt = amount.to_bytes(8, byteorder='big')
+        amount = int(fields[3])	# ignored
+        serial += 1
+        print(txid.hex(), index, serial)
+        val = serial.to_bytes(8, byteorder='big')
         key = mkkey(txid, index)
-        mpt[key] = amt
+        mpt[key] = val
         nutxo += 1
     elif fields[0] == 'I':
         dixt = bytes.fromhex(fields[1])
         txid = dixt[::-1]
         index = int(fields[2])
         if txid != coinbase_txid:
-            if txid.hex() == '8ef28249e5d50230214bded5ffc7769fcb3c6d937779a5aabb6a4088e1c8b78f' and index == 0:
-                print_proof(mpt, xxtxid, xxindex)
             ninputs += 1
             print(txid.hex(), index)
             key = mkkey(txid, index)
@@ -121,9 +119,6 @@ def process_line(mpt, line):
                 print("Trouble w/ %s:%d %s" % (txid.hex(), index, ex))
                 raise
             nutxo -= 1
-            if txid.hex() == '8ef28249e5d50230214bded5ffc7769fcb3c6d937779a5aabb6a4088e1c8b78f' and index == 0:
-                print_proof(mpt, txid, index)
-
     else:
         sys.exit("unknown first field: %s" % (fields[0],))
 

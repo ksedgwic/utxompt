@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+
+import json
+import sys
+from levelpy.leveldb import LevelDB
+from trie import HexaryTrie
+
+def uglify(thing):
+    """Convert a nested list of hex encoded strings into bytes"""
+    if type(thing) == list:
+        retval = []
+        for item in thing:
+            retval.append(uglify(item))
+        return retval
+    elif type(thing) == tuple:
+        retval = []
+        for item in thing:
+            retval.append(uglify(item))
+        return tuple(retval)
+    elif type(thing) == str:
+        return bytes.fromhex(thing)
+    else:
+        print(type(thing))
+        sys.exit(1)
+
+def mkkey(txid, index):
+    ndx = index.to_bytes(4, byteorder='big')
+    return txid + ndx
+
+def verify_proof(roothash, txid, index):
+    # Read the proof from stdin
+    encproof = sys.stdin.read()
+    jsonproof = json.loads(encproof)
+    proof = uglify(jsonproof)
+    key = mkkey(txid, index)
+    value = HexaryTrie.get_from_proof(roothash, key, proof)
+    print(value.hex())
+
+if __name__ == '__main__':
+    roothash = bytes.fromhex(sys.argv[1])
+    txid = bytes.fromhex(sys.argv[2])
+    index = int(sys.argv[3])
+    verify_proof(roothash, txid, index)
